@@ -54,9 +54,12 @@ async def list_users(
 @router.patch("/users/{user_id}/suspend")
 async def suspend_user(user_id: UUID, payload: SuspendIn, session: SessionDep) -> dict[str, bool]:
     result = await session.execute(
-        update(User).where(User.id == user_id).values(is_active=not payload.suspend)
+        update(User)
+        .where(User.id == user_id)
+        .values(is_active=not payload.suspend)
+        .returning(User.id)
     )
-    if result.rowcount == 0:
+    if result.scalar_one_or_none() is None:
         raise NotFoundError("user_not_found")
     await session.commit()
     return {"is_active": not payload.suspend}

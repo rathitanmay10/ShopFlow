@@ -37,4 +37,6 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    return Settings()  # type: ignore[call-arg]
+    # Required fields (database_url, jwt_secret) are populated by pydantic-settings
+    # from the environment / .env file at instantiation time.
+    return Settings()  # ty: ignore[missing-argument]

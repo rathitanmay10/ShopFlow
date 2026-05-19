@@ -143,7 +143,7 @@ class AnalyticsService:
             await self.session.execute(
                 select(
                     func.date_trunc("day", Order.created_at).label("day"),
-                    func.count(Order.id).label("count"),
+                    func.count(Order.id).label("order_count"),
                     func.coalesce(func.sum(Order.total), 0).label("revenue"),
                 )
                 .where(Order.created_at >= since)
@@ -180,7 +180,7 @@ class AnalyticsService:
             daily_orders=[
                 DailyOrders(
                     day=row.day,
-                    count=int(row.count),
+                    count=int(row.order_count),
                     revenue=Decimal(row.revenue),
                 )
                 for row in daily_rows
