@@ -1,8 +1,6 @@
-import pytest
 from httpx import AsyncClient
 
 
-@pytest.mark.asyncio
 async def test_seller_can_create_and_list_product(
     client: AsyncClient, seller, auth_headers
 ) -> None:
@@ -28,7 +26,6 @@ async def test_seller_can_create_and_list_product(
     assert page["items"][0]["sku"] == "SKU-1"
 
 
-@pytest.mark.asyncio
 async def test_customer_cannot_create_product(client: AsyncClient, customer, auth_headers) -> None:
     payload = {"sku": "SKU-2", "name": "Thing", "price": "9.99", "stock_quantity": 1}
     r = await client.post("/api/v1/products", json=payload, headers=auth_headers(customer))
@@ -36,7 +33,6 @@ async def test_customer_cannot_create_product(client: AsyncClient, customer, aut
     assert r.json()["error"]["code"] == "permission_denied"
 
 
-@pytest.mark.asyncio
 async def test_duplicate_sku_rejected(client: AsyncClient, seller, auth_headers) -> None:
     payload = {"sku": "DUP", "name": "X", "price": "1.00", "stock_quantity": 1}
     r = await client.post("/api/v1/products", json=payload, headers=auth_headers(seller))
@@ -45,7 +41,6 @@ async def test_duplicate_sku_rejected(client: AsyncClient, seller, auth_headers)
     assert r.status_code == 409
 
 
-@pytest.mark.asyncio
 async def test_other_seller_cannot_update(
     client: AsyncClient, seller, auth_headers, session
 ) -> None:
@@ -55,7 +50,7 @@ async def test_other_seller_cannot_update(
     from app.models.user import User, UserRole
 
     other = User(
-        email=f"other-{uuid4().hex[:6]}@test.local",
+        email=f"other-{uuid4().hex[:6]}@example.com",
         password_hash=hash_password("Password!123"),
         role=UserRole.SELLER,
         is_active=True,
@@ -78,7 +73,6 @@ async def test_other_seller_cannot_update(
     assert r.status_code == 403
 
 
-@pytest.mark.asyncio
 async def test_soft_delete_excludes_from_list(client: AsyncClient, seller, auth_headers) -> None:
     r = await client.post(
         "/api/v1/products",

@@ -26,4 +26,4 @@ async def enqueue(settings: Settings, task_name: str, *args: Any, **kwargs: Any)
         await pool.enqueue_job(task_name, *args, **kwargs)
         return True
     finally:
-        await pool.close()
+        await pool.aclose()

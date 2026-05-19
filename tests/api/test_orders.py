@@ -1,4 +1,3 @@
-import pytest
 from httpx import AsyncClient
 
 
@@ -12,7 +11,6 @@ async def _create_product(client, seller, auth_headers, *, sku="SKU-O", stock=5,
     return r.json()
 
 
-@pytest.mark.asyncio
 async def test_create_order_happy_path(client: AsyncClient, seller, customer, auth_headers) -> None:
     product = await _create_product(client, seller, auth_headers, stock=5, price="3.50")
 
@@ -33,7 +31,6 @@ async def test_create_order_happy_path(client: AsyncClient, seller, customer, au
     assert r.json()["stock_quantity"] == 3
 
 
-@pytest.mark.asyncio
 async def test_oversell_rejected(client: AsyncClient, seller, customer, auth_headers) -> None:
     product = await _create_product(client, seller, auth_headers, stock=1)
     r = await client.post(
@@ -45,7 +42,6 @@ async def test_oversell_rejected(client: AsyncClient, seller, customer, auth_hea
     assert r.json()["error"]["code"] == "invariant_violation"
 
 
-@pytest.mark.asyncio
 async def test_cancel_restores_stock(client: AsyncClient, seller, customer, auth_headers) -> None:
     product = await _create_product(client, seller, auth_headers, stock=3)
     create = await client.post(
@@ -63,7 +59,6 @@ async def test_cancel_restores_stock(client: AsyncClient, seller, customer, auth
     assert r.json()["stock_quantity"] == 3
 
 
-@pytest.mark.asyncio
 async def test_other_customer_cannot_view_order(
     client: AsyncClient, seller, customer, auth_headers, session
 ) -> None:
@@ -73,7 +68,7 @@ async def test_other_customer_cannot_view_order(
     from app.models.user import User, UserRole
 
     other = User(
-        email=f"snoop-{uuid4().hex[:6]}@test.local",
+        email=f"snoop-{uuid4().hex[:6]}@example.com",
         password_hash=hash_password("Password!123"),
         role=UserRole.CUSTOMER,
         is_active=True,

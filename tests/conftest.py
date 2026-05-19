@@ -1,3 +1,4 @@
+import asyncio
 import os
 import subprocess
 from collections.abc import AsyncIterator
@@ -11,7 +12,6 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
-    async_sessionmaker,
     create_async_engine,
 )
 
@@ -31,13 +31,17 @@ def _test_settings() -> Settings:
     return base.model_copy(update={"database_url": url})
 
 
-def _alembic_upgrade(database_url: str) -> None:
-    """Run `alembic upgrade head` against the test DB via subprocess.
+async def _drop_schema(database_url: str) -> None:
+    eng = create_async_engine(database_url)
+    try:
+        async with eng.begin() as conn:
+            await conn.execute(text("DROP SCHEMA public CASCADE"))
+            await conn.execute(text("CREATE SCHEMA public"))
+    finally:
+        await eng.dispose()
 
-    Subprocess (not `alembic.command.upgrade` in-process) because our alembic
-    env.py uses `asyncio.run`, which can't be called from inside the pytest event
-    loop. The subprocess gets a clean event loop of its own.
-    """
+
+def _alembic_upgrade(database_url: str) -> None:
     env = {**os.environ, "DATABASE_URL": database_url}
     result = subprocess.run(  # noqa: S603
         ["uv", "run", "alembic", "upgrade", "head"],  # noqa: S607
@@ -55,38 +59,45 @@ def _alembic_upgrade(database_url: str) -> None:
         )
 
 
-async def _drop_schema(database_url: str) -> None:
-    """Wipe the test DB so each session starts from migration zero."""
-    eng = create_async_engine(database_url)
-    try:
-        async with eng.begin() as conn:
-            await conn.execute(text("DROP SCHEMA public CASCADE"))
-            await conn.execute(text("CREATE SCHEMA public"))
-    finally:
-        await eng.dispose()
+def pytest_configure(config: pytest.Config) -> None:
+    """Wipe + migrate the test DB once before any tests run.
 
-
-@pytest_asyncio.fixture(scope="session")
-async def engine():
+    Done synchronously here (outside any asyncio event loop) so per-test fixtures
+    can each spin up their own engine/loop without sharing async state.
+    """
     settings = _test_settings()
-    await _drop_schema(settings.database_url)
+    asyncio.run(_drop_schema(settings.database_url))
     _alembic_upgrade(settings.database_url)
-    eng = create_async_engine(settings.database_url, pool_pre_ping=True)
-    yield eng
-    await eng.dispose()
 
 
 @pytest_asyncio.fixture
-async def session(engine) -> AsyncIterator[AsyncSession]:
+async def session() -> AsyncIterator[AsyncSession]:
+    """Per-test AsyncSession with savepoint-based rollback.
+
+    Each test creates its own engine + connection so we never share async state
+    across the event loops pytest-asyncio gives to each test function.
+
+    Pattern: open a real transaction on the connection, attach an AsyncSession
+    that operates inside a SAVEPOINT. Application-side `session.commit()` releases
+    the savepoint; the outer transaction is rolled back at teardown.
+    """
+    settings = _test_settings()
+    engine = create_async_engine(settings.database_url, pool_pre_ping=True)
     connection = await engine.connect()
     trans = await connection.begin()
-    factory = async_sessionmaker(bind=connection, expire_on_commit=False)
-    async with factory() as sess:
-        try:
-            yield sess
-        finally:
+    sess = AsyncSession(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+    try:
+        yield sess
+    finally:
+        await sess.close()
+        if trans.is_active:
             await trans.rollback()
-            await connection.close()
+        await connection.close()
+        await engine.dispose()
 
 
 @pytest_asyncio.fixture
@@ -107,7 +118,7 @@ async def _make_user(
     session: AsyncSession, *, email: str | None = None, role: UserRole = UserRole.CUSTOMER
 ) -> User:
     user = User(
-        email=email or f"u-{uuid4().hex[:8]}@test.local",
+        email=email or f"u-{uuid4().hex[:8]}@example.com",
         password_hash=hash_password("Password!123"),
         role=role,
         is_active=True,
