@@ -10,6 +10,7 @@ from app.core.exceptions import InvariantViolationError, NotFoundError
 from app.models.order import Order, OrderStatus
 from app.models.payment import Payment, PaymentEvent, PaymentStatus
 from app.services.order_state import assert_transition
+from app.workers.queue import enqueue
 
 logger = logging.getLogger(__name__)
 
@@ -62,11 +63,25 @@ class PaymentService:
             self._transition(payment, PaymentStatus.SUCCESS, "simulated_success")
             assert_transition(order.status, OrderStatus.CONFIRMED)
             order.status = OrderStatus.CONFIRMED
+            await enqueue(
+                self.settings,
+                "send_email",
+                str(order.customer_id),
+                "order_confirmed",
+                {"order_id": str(order.id), "total": str(order.total)},
+            )
             return payment
 
         self._transition(payment, PaymentStatus.FAILED, "simulated_failure")
         # Roll back to PENDING so a retry attempt can re-enter PAYMENT_PROCESSING.
         order.status = OrderStatus.PENDING
+        await enqueue(
+            self.settings,
+            "send_email",
+            str(order.customer_id),
+            "payment_failed",
+            {"order_id": str(order.id), "attempt": payment.attempts},
+        )
         raise PaymentSimulationError("payment_simulated_failure")
 
     def _transition(self, payment: Payment, to: PaymentStatus, reason: str) -> None:
