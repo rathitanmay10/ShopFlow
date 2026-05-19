@@ -1,13 +1,12 @@
 from collections.abc import Callable, Coroutine
 from typing import Annotated, Any
-from uuid import UUID
 
 from fastapi import Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import AuthenticationError, PermissionDeniedError
-from app.core.security import TokenType, decode_token
+from app.core.security import TokenType, decode_token, subject_uuid
 from app.db import get_async_session
 from app.models.user import User, UserRole
 from app.repositories.user import UserRepository
@@ -25,11 +24,7 @@ async def get_current_user(
         raise AuthenticationError("missing_token")
     token = authorization.split(" ", 1)[1].strip()
     payload = decode_token(settings, token, TokenType.ACCESS)
-    try:
-        user_id = UUID(payload["sub"])
-    except (KeyError, ValueError) as exc:
-        raise AuthenticationError("invalid_token") from exc
-    user = await UserRepository(session).get_by_id(user_id)
+    user = await UserRepository(session).get_by_id(subject_uuid(payload))
     if user is None or not user.is_active:
         raise AuthenticationError("user_inactive")
     return user

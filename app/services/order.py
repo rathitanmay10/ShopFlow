@@ -88,9 +88,12 @@ class OrderService:
 
         assert_transition(order.status, OrderStatus.PAYMENT_PROCESSING)
         order.status = OrderStatus.PAYMENT_PROCESSING
-
-        await self.session.refresh(order, attribute_names=["items"])
-        return order
+        # Re-fetch via repository so `items` is loaded with selectinload — the
+        # in-memory collection set at construction is not reliably serializable
+        # after flush in async mode.
+        reloaded = await self.orders.get(order.id)
+        assert reloaded is not None  # we just inserted it
+        return reloaded
 
     async def get(self, order_id: UUID, actor: User) -> Order:
         order = await self.orders.get(order_id)
@@ -103,9 +106,8 @@ class OrderService:
     async def list_for_actor(
         self, actor: User, *, page: int, page_size: int
     ) -> tuple[list[Order], int]:
-        if actor.role == UserRole.ADMIN:
-            return await self.orders.list_all(page=page, page_size=page_size)
-        return await self.orders.list_for_customer(actor.id, page=page, page_size=page_size)
+        customer_id = None if actor.role == UserRole.ADMIN else actor.id
+        return await self.orders.list_(customer_id=customer_id, page=page, page_size=page_size)
 
     async def cancel(self, order_id: UUID, actor: User) -> Order:
         order = await self.get(order_id, actor)
@@ -123,4 +125,7 @@ class OrderService:
                 order_id=order.id,
                 actor_id=actor.id,
             )
-        return order
+        # Re-fetch so `items` collection is freshly bound after mutations.
+        reloaded = await self.orders.get(order.id)
+        assert reloaded is not None
+        return reloaded

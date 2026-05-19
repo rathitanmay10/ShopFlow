@@ -2,12 +2,8 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUserDep, SessionDep, SettingsDep
-from app.core.exceptions import NotFoundError
-from app.models.order import Order
 from app.repositories.order import OrderRepository
 from app.schemas.order import OrderCreate, OrderPage, OrderRead
 from app.services.inventory import InventoryService
@@ -29,21 +25,6 @@ def _order_service(session: SessionDep, settings: SettingsDep) -> OrderService:
 OrderServiceDep = Annotated[OrderService, Depends(_order_service)]
 
 
-async def _reload_with_items(session, order_id: UUID) -> Order:
-    """Reload an order with `items` eagerly loaded via selectinload.
-
-    `session.refresh(order, attribute_names=["items"])` is unreliable for
-    relationship collections in async mode — Pydantic `model_validate` can then
-    hit a non-loaded collection and fail. Explicit query is bulletproof.
-    """
-    order = await session.scalar(
-        select(Order).options(selectinload(Order.items)).where(Order.id == order_id)
-    )
-    if order is None:
-        raise NotFoundError("order_not_found")
-    return order
-
-
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_order(
     payload: OrderCreate,
@@ -54,7 +35,6 @@ async def create_order(
 ) -> OrderRead:
     order = await service.create_order(user, payload)
     await session.commit()
-    order = await _reload_with_items(session, order.id)
     await enqueue(settings, "process_payment", str(order.id))
     return OrderRead.model_validate(order)
 
@@ -79,11 +59,9 @@ async def list_orders(
 async def get_order(
     order_id: UUID,
     user: CurrentUserDep,
-    session: SessionDep,
     service: OrderServiceDep,
 ) -> OrderRead:
     order = await service.get(order_id, user)
-    order = await _reload_with_items(session, order.id)
     return OrderRead.model_validate(order)
 
 
@@ -96,5 +74,4 @@ async def cancel_order(
 ) -> OrderRead:
     order = await service.cancel(order_id, user)
     await session.commit()
-    order = await _reload_with_items(session, order.id)
     return OrderRead.model_validate(order)

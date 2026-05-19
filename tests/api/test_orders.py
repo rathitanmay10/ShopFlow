@@ -62,20 +62,10 @@ async def test_cancel_restores_stock(client: AsyncClient, seller, customer, auth
 async def test_other_customer_cannot_view_order(
     client: AsyncClient, seller, customer, auth_headers, session
 ) -> None:
-    from uuid import uuid4
+    from app.models.user import UserRole
+    from tests.conftest import _make_user
 
-    from app.core.security import hash_password
-    from app.models.user import User, UserRole
-
-    other = User(
-        email=f"snoop-{uuid4().hex[:6]}@example.com",
-        password_hash=hash_password("Password!123"),
-        role=UserRole.CUSTOMER,
-        is_active=True,
-        is_verified=True,
-    )
-    session.add(other)
-    await session.flush()
+    other = await _make_user(session, role=UserRole.CUSTOMER)
 
     product = await _create_product(client, seller, auth_headers, stock=2)
     create = await client.post(

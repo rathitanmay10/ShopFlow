@@ -1,12 +1,9 @@
-import logging
-
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
 from app.core.config import Settings
 from app.core.exceptions import RateLimitedError
-
-logger = logging.getLogger(__name__)
+from app.core.redis_client import get_redis_or_none
 
 
 class LoginThrottle:
@@ -22,14 +19,8 @@ class LoginThrottle:
         self._client: Redis | None = None
 
     async def _client_or_none(self) -> Redis | None:
-        if self._client is not None:
-            return self._client
-        try:
-            self._client = Redis.from_url(self.settings.redis_url, decode_responses=True)
-            await self._client.ping()
-        except RedisError:
-            logger.warning("login_throttle_redis_unavailable", exc_info=True)
-            self._client = None
+        if self._client is None:
+            self._client = await get_redis_or_none(self.settings.redis_url, ctx="login_throttle")
         return self._client
 
     @staticmethod
@@ -55,10 +46,11 @@ class LoginThrottle:
         client = await self._client_or_none()
         if client is None:
             return
+        key = self._key(ip, email)
         try:
-            count = await client.incr(self._key(ip, email))
+            count = await client.incr(key)
             if count == 1:
-                await client.expire(self._key(ip, email), 60)
+                await client.expire(key, 60)
         except RedisError:
             return
 

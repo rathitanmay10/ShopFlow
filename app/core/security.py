@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any
+from uuid import UUID
 
 import bcrypt
 from jose import JWTError, jwt
@@ -59,3 +60,11 @@ def decode_token(settings: Settings, token: str, expected_type: TokenType) -> di
     if payload.get("type") != expected_type.value:
         raise AuthenticationError("wrong_token_type")
     return payload
+
+
+def subject_uuid(payload: dict[str, Any]) -> UUID:
+    """Extract the `sub` claim from a decoded token payload and parse it as a UUID."""
+    try:
+        return UUID(payload["sub"])
+    except (KeyError, ValueError) as exc:
+        raise AuthenticationError("invalid_token") from exc

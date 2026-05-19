@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.core.config import get_settings
 from app.core.exceptions import InvariantViolationError
 from app.core.security import hash_password
 from app.models.inventory import InventoryMovement, MovementReason
@@ -35,7 +34,7 @@ async def _make_product(session, seller, *, stock=5, sku="SKU-INV"):
 
 async def test_decrement_succeeds_when_stock_available(session, seller) -> None:
     product = await _make_product(session, seller, stock=5)
-    svc = InventoryService(session, get_settings())
+    svc = InventoryService(session, _test_settings())
     new_qty = await svc.decrement(product.id, 3, reason=MovementReason.ORDER, actor_id=seller.id)
     assert new_qty == 2
 
@@ -49,7 +48,7 @@ async def test_decrement_succeeds_when_stock_available(session, seller) -> None:
 
 async def test_decrement_raises_on_insufficient_stock(session, seller) -> None:
     product = await _make_product(session, seller, stock=1, sku="SKU-INV-2")
-    svc = InventoryService(session, get_settings())
+    svc = InventoryService(session, _test_settings())
     with pytest.raises(InvariantViolationError) as exc:
         await svc.decrement(product.id, 2, reason=MovementReason.ORDER)
     assert "insufficient_stock" in str(exc.value)
@@ -57,7 +56,7 @@ async def test_decrement_raises_on_insufficient_stock(session, seller) -> None:
 
 async def test_restore_brings_stock_back(session, seller) -> None:
     product = await _make_product(session, seller, stock=3, sku="SKU-INV-3")
-    svc = InventoryService(session, get_settings())
+    svc = InventoryService(session, _test_settings())
     await svc.decrement(product.id, 3, reason=MovementReason.ORDER)
     await session.refresh(product)
     assert product.stock_quantity == 0

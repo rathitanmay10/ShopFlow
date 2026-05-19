@@ -150,7 +150,6 @@ class InventoryService:
     def _maybe_log_low_stock(self, product_id: UUID, qty: int) -> None:
         if qty > self.settings.low_stock_threshold:
             return
-        # Phase 7 will enqueue an ARQ notification task to the seller here.
         logger.warning(
             "low_stock",
             extra={

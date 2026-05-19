@@ -3,11 +3,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import update
 
 from app.api.deps import SessionDep, SettingsDep, require_role
 from app.core.exceptions import NotFoundError
-from app.models.user import User, UserRole
+from app.models.user import UserRole
+from app.repositories.user import UserRepository
 from app.schemas.analytics import (
     AnalyticsSummary,
     AnalyticsWindow,
@@ -53,16 +53,11 @@ async def list_users(
 
 @router.patch("/users/{user_id}/suspend")
 async def suspend_user(user_id: UUID, payload: SuspendIn, session: SessionDep) -> dict[str, bool]:
-    result = await session.execute(
-        update(User)
-        .where(User.id == user_id)
-        .values(is_active=not payload.suspend)
-        .returning(User.id)
-    )
-    if result.scalar_one_or_none() is None:
+    active = not payload.suspend
+    if not await UserRepository(session).set_active(user_id, active=active):
         raise NotFoundError("user_not_found")
     await session.commit()
-    return {"is_active": not payload.suspend}
+    return {"is_active": active}
 
 
 @router.get("/audit-logs")

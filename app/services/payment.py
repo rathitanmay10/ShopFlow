@@ -65,8 +65,9 @@ class PaymentService:
             order.status = OrderStatus.CONFIRMED
             await enqueue(
                 self.settings,
-                "send_email",
+                "send_notification",
                 str(order.customer_id),
+                "email",
                 "order_confirmed",
                 {"order_id": str(order.id), "total": str(order.total)},
             )
@@ -77,8 +78,9 @@ class PaymentService:
         order.status = OrderStatus.PENDING
         await enqueue(
             self.settings,
-            "send_email",
+            "send_notification",
             str(order.customer_id),
+            "email",
             "payment_failed",
             {"order_id": str(order.id), "attempt": payment.attempts},
         )

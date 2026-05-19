@@ -28,6 +28,12 @@ _WINDOW_DAYS: dict[AnalyticsWindow, int] = {
     AnalyticsWindow.MONTH: 30,
 }
 
+_REVENUE_STATUSES = [
+    OrderStatus.CONFIRMED,
+    OrderStatus.SHIPPED,
+    OrderStatus.DELIVERED,
+]
+
 
 class AnalyticsService:
     def __init__(self, session: AsyncSession, settings: Settings) -> None:
@@ -40,13 +46,7 @@ class AnalyticsService:
         total_revenue = (
             await self.session.execute(
                 select(func.coalesce(func.sum(Order.total), 0)).where(
-                    Order.status.in_(
-                        [
-                            OrderStatus.CONFIRMED,
-                            OrderStatus.SHIPPED,
-                            OrderStatus.DELIVERED,
-                        ]
-                    ),
+                    Order.status.in_(_REVENUE_STATUSES),
                     Order.created_at >= since,
                 )
             )
@@ -96,13 +96,7 @@ class AnalyticsService:
                 .join(Product, OrderItem.product_id == Product.id)
                 .where(
                     Order.created_at >= since,
-                    Order.status.in_(
-                        [
-                            OrderStatus.CONFIRMED,
-                            OrderStatus.SHIPPED,
-                            OrderStatus.DELIVERED,
-                        ]
-                    ),
+                    Order.status.in_(_REVENUE_STATUSES),
                 )
                 .group_by(OrderItem.product_id, Product.name)
                 .order_by(func.sum(OrderItem.quantity).desc())
@@ -125,13 +119,7 @@ class AnalyticsService:
                 .join(User, User.id == Product.seller_id)
                 .where(
                     Order.created_at >= since,
-                    Order.status.in_(
-                        [
-                            OrderStatus.CONFIRMED,
-                            OrderStatus.SHIPPED,
-                            OrderStatus.DELIVERED,
-                        ]
-                    ),
+                    Order.status.in_(_REVENUE_STATUSES),
                 )
                 .group_by(Product.seller_id, User.email)
                 .order_by(func.sum(OrderItem.quantity * OrderItem.unit_price).desc())

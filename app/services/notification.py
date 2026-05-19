@@ -21,12 +21,10 @@ class NotificationService:
     async def send(
         self,
         user_id: UUID,
-        channel: NotificationChannel | str,
+        channel: NotificationChannel,
         event_type: str,
         payload: dict[str, Any],
     ) -> Notification:
-        if isinstance(channel, str):
-            channel = NotificationChannel(channel)
         notification = Notification(
             user_id=user_id,
             channel=channel,

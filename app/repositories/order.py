@@ -16,29 +16,16 @@ class OrderRepository:
             select(Order).options(selectinload(Order.items)).where(Order.id == order_id)
         )
 
-    async def list_for_customer(
-        self, customer_id: UUID, *, page: int, page_size: int
+    async def list_(
+        self,
+        *,
+        customer_id: UUID | None = None,
+        page: int,
+        page_size: int,
     ) -> tuple[list[Order], int]:
-        base = select(Order).where(Order.customer_id == customer_id)
-        total = (
-            await self.session.execute(select(func.count()).select_from(base.subquery()))
-        ).scalar_one()
-        rows = (
-            (
-                await self.session.execute(
-                    base.options(selectinload(Order.items))
-                    .order_by(Order.created_at.desc())
-                    .offset((page - 1) * page_size)
-                    .limit(page_size)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        return list(rows), total
-
-    async def list_all(self, *, page: int, page_size: int) -> tuple[list[Order], int]:
         base = select(Order)
+        if customer_id is not None:
+            base = base.where(Order.customer_id == customer_id)
         total = (
             await self.session.execute(select(func.count()).select_from(base.subquery()))
         ).scalar_one()

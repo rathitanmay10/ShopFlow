@@ -22,3 +22,12 @@ class UserRepository:
         await self.session.flush()
         await self.session.refresh(user)
         return user
+
+    async def set_active(self, user_id: UUID, *, active: bool) -> bool:
+        """Set `is_active` flag. Returns True if a user row was updated."""
+        from sqlalchemy import update
+
+        result = await self.session.execute(
+            update(User).where(User.id == user_id).values(is_active=active).returning(User.id)
+        )
+        return result.scalar_one_or_none() is not None

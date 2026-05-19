@@ -44,20 +44,10 @@ async def test_duplicate_sku_rejected(client: AsyncClient, seller, auth_headers)
 async def test_other_seller_cannot_update(
     client: AsyncClient, seller, auth_headers, session
 ) -> None:
-    from uuid import uuid4
+    from app.models.user import UserRole
+    from tests.conftest import _make_user
 
-    from app.core.security import hash_password
-    from app.models.user import User, UserRole
-
-    other = User(
-        email=f"other-{uuid4().hex[:6]}@example.com",
-        password_hash=hash_password("Password!123"),
-        role=UserRole.SELLER,
-        is_active=True,
-        is_verified=True,
-    )
-    session.add(other)
-    await session.flush()
+    other = await _make_user(session, role=UserRole.SELLER)
 
     create = await client.post(
         "/api/v1/products",

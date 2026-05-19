@@ -1,5 +1,3 @@
-from uuid import UUID
-
 from app.core.config import Settings
 from app.core.exceptions import AuthenticationError, ConflictError
 from app.core.security import (
@@ -7,6 +5,7 @@ from app.core.security import (
     create_token,
     decode_token,
     hash_password,
+    subject_uuid,
     verify_password,
 )
 from app.models.user import User
@@ -41,11 +40,7 @@ class AuthService:
 
     async def refresh(self, refresh_token: str) -> TokenPair:
         payload = decode_token(self.settings, refresh_token, TokenType.REFRESH)
-        try:
-            user_id = UUID(payload["sub"])
-        except (KeyError, ValueError) as exc:
-            raise AuthenticationError("invalid_token") from exc
-        user = await self.users.get_by_id(user_id)
+        user = await self.users.get_by_id(subject_uuid(payload))
         if user is None or not user.is_active:
             raise AuthenticationError("user_inactive")
         return self._issue_tokens(user)

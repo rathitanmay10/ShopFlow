@@ -1,4 +1,3 @@
-import logging
 import time
 from collections.abc import Awaitable, Callable
 
@@ -9,8 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from app.core.config import get_settings
-
-logger = logging.getLogger(__name__)
+from app.core.redis_client import get_redis_or_none
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -29,14 +27,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._client: Redis | None = None
 
     async def _get_client(self) -> Redis | None:
-        if self._client is not None:
-            return self._client
-        try:
-            self._client = Redis.from_url(self._redis_url, decode_responses=True)
-            await self._client.ping()
-        except RedisError:
-            logger.warning("rate_limit_redis_unavailable", exc_info=True)
-            self._client = None
+        if self._client is None:
+            self._client = await get_redis_or_none(self._redis_url, ctx="rate_limit")
         return self._client
 
     async def dispatch(
