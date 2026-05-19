@@ -1,11 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 
 from app.api.deps import SessionDep, SettingsDep
+from app.core.exceptions import AuthenticationError
 from app.repositories.user import UserRepository
 from app.schemas.auth import LoginIn, RefreshIn, TokenPair, UserCreate, UserRead
 from app.services.auth import AuthService
+from app.services.login_throttle import LoginThrottle
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -29,8 +31,22 @@ async def register(
 
 
 @router.post("/login")
-async def login(payload: LoginIn, service: AuthServiceDep) -> TokenPair:
-    return await service.login(payload)
+async def login(
+    payload: LoginIn,
+    request: Request,
+    service: AuthServiceDep,
+    settings: SettingsDep,
+) -> TokenPair:
+    ip = request.client.host if request.client else "unknown"
+    throttle = LoginThrottle(settings)
+    await throttle.check(ip, payload.email)
+    try:
+        tokens = await service.login(payload)
+    except AuthenticationError:
+        await throttle.record_failure(ip, payload.email)
+        raise
+    await throttle.record_success(ip, payload.email)
+    return tokens
 
 
 @router.post("/refresh")
