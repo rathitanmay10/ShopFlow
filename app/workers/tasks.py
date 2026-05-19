@@ -68,6 +68,6 @@ class WorkerSettings:
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
     on_startup = startup
     on_shutdown = shutdown
-    functions = [process_payment, send_email, send_sms, create_in_app]
+    functions = (process_payment, send_email, send_sms, create_in_app)
     max_tries = 4
     retry_delay = 5

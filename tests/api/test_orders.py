@@ -13,9 +13,7 @@ async def _create_product(client, seller, auth_headers, *, sku="SKU-O", stock=5,
 
 
 @pytest.mark.asyncio
-async def test_create_order_happy_path(
-    client: AsyncClient, seller, customer, auth_headers
-) -> None:
+async def test_create_order_happy_path(client: AsyncClient, seller, customer, auth_headers) -> None:
     product = await _create_product(client, seller, auth_headers, stock=5, price="3.50")
 
     r = await client.post(
@@ -36,9 +34,7 @@ async def test_create_order_happy_path(
 
 
 @pytest.mark.asyncio
-async def test_oversell_rejected(
-    client: AsyncClient, seller, customer, auth_headers
-) -> None:
+async def test_oversell_rejected(client: AsyncClient, seller, customer, auth_headers) -> None:
     product = await _create_product(client, seller, auth_headers, stock=1)
     r = await client.post(
         "/api/v1/orders",
@@ -50,9 +46,7 @@ async def test_oversell_rejected(
 
 
 @pytest.mark.asyncio
-async def test_cancel_restores_stock(
-    client: AsyncClient, seller, customer, auth_headers
-) -> None:
+async def test_cancel_restores_stock(client: AsyncClient, seller, customer, auth_headers) -> None:
     product = await _create_product(client, seller, auth_headers, stock=3)
     create = await client.post(
         "/api/v1/orders",
@@ -61,9 +55,7 @@ async def test_cancel_restores_stock(
     )
     order_id = create.json()["id"]
 
-    r = await client.post(
-        f"/api/v1/orders/{order_id}/cancel", headers=auth_headers(customer)
-    )
+    r = await client.post(f"/api/v1/orders/{order_id}/cancel", headers=auth_headers(customer))
     assert r.status_code == 200
     assert r.json()["status"] == "cancelled"
 
@@ -75,9 +67,11 @@ async def test_cancel_restores_stock(
 async def test_other_customer_cannot_view_order(
     client: AsyncClient, seller, customer, auth_headers, session
 ) -> None:
-    from app.models.user import User, UserRole
-    from app.core.security import hash_password
     from uuid import uuid4
+
+    from app.core.security import hash_password
+    from app.models.user import User, UserRole
+
     other = User(
         email=f"snoop-{uuid4().hex[:6]}@test.local",
         password_hash=hash_password("Password!123"),

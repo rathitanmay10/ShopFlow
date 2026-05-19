@@ -6,6 +6,7 @@ from app.api.v1.router import api_v1
 from app.core.config import get_settings
 from app.core.exceptions import DomainError
 from app.core.logging import configure_logging
+from app.middleware.request_context import RequestContextMiddleware
 
 
 def create_app() -> FastAPI:
@@ -18,6 +19,8 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
     )
+
+    app.add_middleware(RequestContextMiddleware)
 
     if settings.cors_origin_list:
         app.add_middleware(

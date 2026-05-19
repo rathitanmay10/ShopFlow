@@ -32,9 +32,7 @@ class PaymentService:
 
     async def get_or_create_for_order(self, order: Order) -> Payment:
         existing = (
-            await self.session.execute(
-                select(Payment).where(Payment.order_id == order.id)
-            )
+            await self.session.execute(select(Payment).where(Payment.order_id == order.id))
         ).scalar_one_or_none()
         if existing is not None:
             return existing

@@ -8,6 +8,7 @@ from app.repositories.order import OrderRepository
 from app.schemas.order import OrderCreate, OrderPage, OrderRead
 from app.services.inventory import InventoryService
 from app.services.order import OrderService
+from app.workers.queue import enqueue
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -29,11 +30,13 @@ async def create_order(
     payload: OrderCreate,
     user: CurrentUserDep,
     session: SessionDep,
+    settings: SettingsDep,
     service: OrderServiceDep,
 ) -> OrderRead:
     order = await service.create_order(user, payload)
     await session.commit()
     await session.refresh(order, attribute_names=["items"])
+    await enqueue(settings, "process_payment", str(order.id))
     return OrderRead.model_validate(order)
 
 
