@@ -38,7 +38,11 @@ class Product(Base):
         Integer, nullable=False, default=0, server_default="0"
     )
     status: Mapped[ProductStatus] = mapped_column(
-        Enum(ProductStatus, name="product_status"),
+        Enum(
+            ProductStatus,
+            name="product_status",
+            values_callable=lambda e: [m.value for m in e],
+        ),
         nullable=False,
         default=ProductStatus.ACTIVE,
         server_default=ProductStatus.ACTIVE.value,

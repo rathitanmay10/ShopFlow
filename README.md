@@ -131,15 +131,39 @@ Stock decrement is atomic: `UPDATE products SET stock = stock - :qty WHERE id = 
 
 ## Tests
 
+Postgres + Redis must be reachable. The typical setup is "DB on docker, everything else on host":
+
 ```bash
+# 1. Bring up Postgres + Redis (one-time, leave running)
+docker compose up postgres redis -d
+
+# 2. Create the test database (one-time)
+docker compose exec postgres createdb -U shopflow shopflow_test
+
+# 3. Run
 uv run pytest
 uv run pytest tests/services/test_inventory.py -k race    # concurrency race
 uv run pytest --cov=app                                    # with coverage
 ```
 
-Each test runs inside an outer transaction that is rolled back at teardown, so the DB stays clean. Requires a real Postgres reachable at `TEST_DATABASE_URL` (or falls back to `DATABASE_URL`).
+`.env` points `DATABASE_URL` / `TEST_DATABASE_URL` / `REDIS_URL` at `localhost` (docker publishes 5432 and 6379 to the host). The compose `api`, `worker`, and `migrate` services override these to use service names — that's why `docker compose up --build` still works without editing `.env`.
+
+The session-scope conftest fixture runs `alembic upgrade head` against the test database, after wiping the public schema. So tests exercise the **same migration graph** the production stack uses. Each test then runs inside an outer transaction rolled back at teardown — the schema persists across the session, only data is reset.
 
 ARQ tasks are tested by calling the task function directly — no live worker or Redis needed.
+
+### Migrations workflow
+
+```bash
+# After changing a model, autogenerate a new revision
+uv run alembic revision --autogenerate -m "describe change"
+
+# Inspect — autogenerate misses enum changes and some server defaults; hand-edit if needed
+$EDITOR alembic/versions/000X_*.py
+
+# Apply
+uv run alembic upgrade head
+```
 
 ## Code quality
 

@@ -30,7 +30,11 @@ class Order(Base):
         index=True,
     )
     status: Mapped[OrderStatus] = mapped_column(
-        Enum(OrderStatus, name="order_status"),
+        Enum(
+            OrderStatus,
+            name="order_status",
+            values_callable=lambda e: [m.value for m in e],
+        ),
         nullable=False,
         default=OrderStatus.PENDING,
         server_default=OrderStatus.PENDING.value,

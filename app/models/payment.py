@@ -31,7 +31,11 @@ class Payment(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="USD")
     status: Mapped[PaymentStatus] = mapped_column(
-        Enum(PaymentStatus, name="payment_status"),
+        Enum(
+            PaymentStatus,
+            name="payment_status",
+            values_callable=lambda e: [m.value for m in e],
+        ),
         nullable=False,
         default=PaymentStatus.INITIATED,
         server_default=PaymentStatus.INITIATED.value,
@@ -63,10 +67,22 @@ class PaymentEvent(Base):
         index=True,
     )
     from_status: Mapped[PaymentStatus | None] = mapped_column(
-        Enum(PaymentStatus, name="payment_status", create_type=False), nullable=True
+        Enum(
+            PaymentStatus,
+            name="payment_status",
+            create_type=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=True,
     )
     to_status: Mapped[PaymentStatus] = mapped_column(
-        Enum(PaymentStatus, name="payment_status", create_type=False), nullable=False
+        Enum(
+            PaymentStatus,
+            name="payment_status",
+            create_type=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=False,
     )
     reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

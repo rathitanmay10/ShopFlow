@@ -29,7 +29,12 @@ class InventoryMovement(Base):
     )
     delta: Mapped[int] = mapped_column(Integer, nullable=False)
     reason: Mapped[MovementReason] = mapped_column(
-        Enum(MovementReason, name="movement_reason"), nullable=False
+        Enum(
+            MovementReason,
+            name="movement_reason",
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=False,
     )
     order_id: Mapped[UUID | None] = mapped_column(PgUUID(as_uuid=True), nullable=True)
     actor_id: Mapped[UUID | None] = mapped_column(PgUUID(as_uuid=True), nullable=True)
