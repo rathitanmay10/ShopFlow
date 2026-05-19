@@ -74,8 +74,8 @@ app/
 ├── schemas/        Pydantic v2 DTOs
 ├── repositories/   SQL access (one per aggregate root)
 ├── services/       business logic (orchestrates repos)
-├── workers/        ARQ tasks (payment, notifications) + WorkerSettings, queue helper
-├── middleware/     request-context (request-id, access log), rate-limit
+├── workers/        ARQ tasks: process_payment, send_notification + WorkerSettings, queue helper
+├── middleware/     request-context (request-id, access log), rate-limit (per-IP)
 ├── utils/
 └── main.py         app factory
 alembic/            migrations 0001..0007
@@ -127,7 +127,9 @@ Stock decrement is atomic: `UPDATE products SET stock = stock - :qty WHERE id = 
 
 ## Payments
 
-`PaymentService.process` is invoked by the `process_payment` ARQ task right after order creation. Outcome is randomized per `PAYMENT_SUCCESS_RATE`. Each transition (`INITIATED → PROCESSING → SUCCESS|FAILED`) is persisted to `payment_events`. Failures raise `PaymentSimulationError` so ARQ retries up to `WorkerSettings.max_tries` with backoff. Success triggers an `order_confirmed` email notification; failure triggers `payment_failed`.
+`PaymentService.process` is invoked by the `process_payment` ARQ task right after order creation. Outcome is randomized per `PAYMENT_SUCCESS_RATE`. Each transition (`INITIATED → PROCESSING → SUCCESS|FAILED`) is persisted to `payment_events`. Failures raise `PaymentSimulationError` so ARQ retries up to `WorkerSettings.max_tries` with backoff.
+
+Notifications are dispatched via a single ARQ task — `send_notification(user_id, channel, event_type, payload)` — with `channel ∈ {email, sms, in_app}`. Payment success enqueues `order_confirmed`; failure enqueues `payment_failed`. Delivery is simulated: each row goes into `notifications` and is marked `sent`.
 
 ## Tests
 
@@ -148,9 +150,9 @@ uv run pytest --cov=app                                    # with coverage
 
 `.env` points `DATABASE_URL` / `TEST_DATABASE_URL` / `REDIS_URL` at `localhost` (docker publishes 5432 and 6379 to the host). The compose `api`, `worker`, and `migrate` services override these to use service names — that's why `docker compose up --build` still works without editing `.env`.
 
-The session-scope conftest fixture runs `alembic upgrade head` against the test database, after wiping the public schema. So tests exercise the **same migration graph** the production stack uses. Each test then runs inside an outer transaction rolled back at teardown — the schema persists across the session, only data is reset.
+`pytest_configure` (sync, runs once before any tests) wipes the public schema and runs `alembic upgrade head` against the test database via subprocess. Tests therefore exercise the **same migration graph** the production stack uses, not an ORM-generated `metadata.create_all`. Each test gets a fresh `AsyncEngine` and a transactional rollback session (`AsyncSession(join_transaction_mode="create_savepoint")`); application-side `session.commit()` calls release a savepoint, and the outer transaction is rolled back at teardown.
 
-ARQ tasks are tested by calling the task function directly — no live worker or Redis needed.
+ARQ tasks are tested by calling the task function directly — no live worker or Redis needed. Redis-backed helpers (rate limit, login throttle, ARQ enqueue) fall open when Redis is unreachable, so most tests don't need Redis at all.
 
 ### Migrations workflow
 
@@ -223,7 +225,8 @@ Import in Postman: `File → Import → shopflow.postman.json`.
 
 ## Known gaps
 
-- ARQ pool not yet in FastAPI lifespan — `enqueue` opens a fresh pool per call (fine for now, hot path later).
+- ARQ pool not yet in FastAPI lifespan — `enqueue` opens a fresh pool per call (acceptable for now, hot path later).
 - Payment terminal failure (after max retries) does not auto-cancel the order or restore stock yet.
-- Low-stock notification is logger-only; seller lookup + enqueue not wired.
-- `AuditMiddleware` records request-id + access logs but does not auto-write `audit_logs` rows — call `AuditService.record(...)` from services for explicit business events.
+- Low-stock notification is logger-only; seller lookup + `send_notification` enqueue not wired.
+- `RequestContextMiddleware` emits request-id + access logs but does not auto-write `audit_logs` rows — call `AuditService.record(...)` from services for explicit business events.
+- Per-test engine in `tests/conftest.py` adds ~30–50 ms overhead per test. Acceptable while suite is small; revisit if it grows past ~50 tests.
