@@ -36,12 +36,14 @@ class OrderService:
     async def create_order(self, customer: User, payload: OrderCreate) -> Order:
         product_ids = [it.product_id for it in payload.items]
         rows = (
-            await self.session.execute(
-                select(Product).where(
-                    Product.id.in_(product_ids), Product.deleted_at.is_(None)
+            (
+                await self.session.execute(
+                    select(Product).where(Product.id.in_(product_ids), Product.deleted_at.is_(None))
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         product_map = {p.id: p for p in rows}
         missing = set(product_ids) - set(product_map.keys())
         if missing:
@@ -103,9 +105,7 @@ class OrderService:
     ) -> tuple[list[Order], int]:
         if actor.role == UserRole.ADMIN:
             return await self.orders.list_all(page=page, page_size=page_size)
-        return await self.orders.list_for_customer(
-            actor.id, page=page, page_size=page_size
-        )
+        return await self.orders.list_for_customer(actor.id, page=page, page_size=page_size)
 
     async def cancel(self, order_id: UUID, actor: User) -> Order:
         order = await self.get(order_id, actor)

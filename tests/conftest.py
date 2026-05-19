@@ -22,7 +22,8 @@ from app.models.user import User, UserRole
 def _test_settings() -> Settings:
     base = get_settings()
     url = base.test_database_url or base.database_url
-    return base.model_copy(update={"database_url": url, "jwt_secret": base.jwt_secret or "test-secret"})
+    secret = base.jwt_secret or "test-secret"  # noqa: S105
+    return base.model_copy(update={"database_url": url, "jwt_secret": secret})
 
 
 @pytest_asyncio.fixture(scope="session")

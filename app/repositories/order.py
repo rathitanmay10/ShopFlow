@@ -17,16 +17,16 @@ class OrderRepository:
         self, customer_id: UUID, *, page: int, page_size: int
     ) -> tuple[list[Order], int]:
         stmt = (
-            select(Order)
-            .where(Order.customer_id == customer_id)
-            .order_by(Order.created_at.desc())
+            select(Order).where(Order.customer_id == customer_id).order_by(Order.created_at.desc())
         )
         total = (
             await self.session.execute(select(func.count()).select_from(stmt.subquery()))
         ).scalar_one()
         rows = (
-            await self.session.execute(stmt.offset((page - 1) * page_size).limit(page_size))
-        ).scalars().all()
+            (await self.session.execute(stmt.offset((page - 1) * page_size).limit(page_size)))
+            .scalars()
+            .all()
+        )
         return list(rows), total
 
     async def list_all(self, *, page: int, page_size: int) -> tuple[list[Order], int]:
@@ -35,6 +35,8 @@ class OrderRepository:
             await self.session.execute(select(func.count()).select_from(stmt.subquery()))
         ).scalar_one()
         rows = (
-            await self.session.execute(stmt.offset((page - 1) * page_size).limit(page_size))
-        ).scalars().all()
+            (await self.session.execute(stmt.offset((page - 1) * page_size).limit(page_size)))
+            .scalars()
+            .all()
+        )
         return list(rows), total
