@@ -66,11 +66,6 @@ class ProductService:
         data = payload.model_dump(exclude_unset=True)
         for key, value in data.items():
             setattr(product, key, value)
-        if "stock_quantity" in data and "status" not in data:
-            if product.stock_quantity == 0 and product.status == ProductStatus.ACTIVE:
-                product.status = ProductStatus.OUT_OF_STOCK
-            elif product.stock_quantity > 0 and product.status == ProductStatus.OUT_OF_STOCK:
-                product.status = ProductStatus.ACTIVE
         return product
 
     async def soft_delete(self, product_id: UUID, actor: User) -> None:

@@ -18,11 +18,16 @@ class ProductCreate(BaseModel):
 
 
 class ProductUpdate(BaseModel):
+    """Mutable product attributes.
+
+    Stock changes go through `POST /products/{id}/inventory/adjust`, not here —
+    so every movement is recorded in `inventory_movements`.
+    """
+
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
     price: Decimal | None = Field(default=None, gt=0, decimal_places=2, max_digits=12)
     category_id: UUID | None = None
-    stock_quantity: int | None = Field(default=None, ge=0)
     status: ProductStatus | None = None
 
 
