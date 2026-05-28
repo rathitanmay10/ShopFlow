@@ -56,6 +56,9 @@ Already-`SHIPPED` or `DELIVERED` orders cannot be cancelled via this endpoint.
 
 ## What does NOT happen
 
-- Payment terminal failure does **not** auto-cancel the order or restore stock (open gap).
 - There's no scheduled "expire pending orders" sweep.
 - `SHIPPED` / `DELIVERED` transitions are not exposed via HTTP yet.
+
+## System cancellation
+
+`OrderService.system_cancel(order_id)` performs the same flow as customer-initiated `cancel(order_id, actor)` — verify `CANCELLABLE`, restore stock per line item, transition to `CANCELLED` — but **without** an actor permission check or audit-trail actor id. It's used by the payment worker on terminal failure (see [Payments](payments.md)) and is never exposed over HTTP.

@@ -34,11 +34,21 @@ Each call:
 
 ### Failure path (terminal, after max retries)
 
-ARQ exhausts retries → task no longer re-enqueued. The failure branch in the service already enqueued `send_notification(user_id, EMAIL, "payment_failed", ...)` before raising on the final attempt. The order is left in `PENDING`. **It is not auto-cancelled and stock is not auto-restored** — that's an open gap.
+`process_payment` in `app/workers/tasks.py` detects the terminal attempt via `ctx["job_try"] >= WorkerSettings.max_tries`. On terminal failure:
+
+1. Commit the FAILED `PaymentEvent` + `attempts` increment + order `PENDING` reset (so the audit trail survives).
+2. Open a fresh session and call `OrderService.system_cancel(order_id)` — that path restores stock for every line item via `InventoryService.restore` (`reason=CANCEL`, `actor_id=None`) and transitions the order to `CANCELLED`.
+3. Commit and log `payment_terminal_cancel`.
+
+The `payment_failed` email notification is already enqueued by the service on every failed attempt — including the terminal one — so the customer is informed without a separate terminal-only branch.
+
+Net effect: terminal payment failure leaves the order `CANCELLED`, stock restored, payment row at `FAILED` with the full event history, and the customer notified.
 
 ## Terminal errors (no retry)
 
-`NotFoundError` and `InvariantViolationError` raised from `process` are caught in `app/workers/tasks.py::process_payment` and logged at warning level — **without** re-raising. ARQ does not retry. These indicate stale queue entries: e.g. the order was cancelled or the DB was reset between enqueue and process. Retrying would never succeed.
+`NotFoundError` and `InvariantViolationError` raised from `process` are caught in `app/workers/tasks.py::process_payment` and logged at warning level — **without** re-raising. ARQ does not retry. These indicate stale queue entries: e.g. the order was already cancelled or the DB was reset between enqueue and process. Retrying would never succeed.
+
+`PaymentSimulationError` is the **retryable** terminal: it propagates back to ARQ on every attempt except the last one. On the final attempt, the worker swallows it after running the system-cancel path described above, so ARQ doesn't log a spurious "task failed" stack trace for a state the system has already cleaned up.
 
 ## Event log
 

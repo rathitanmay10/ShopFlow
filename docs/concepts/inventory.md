@@ -47,4 +47,12 @@ uv run pytest -k race -x
 
 ## Low-stock signal
 
-When stock drops below `LOW_STOCK_THRESHOLD` (default 5), the service emits a `low_stock` event. Currently logger-only — seller lookup + `send_notification` enqueue is not yet wired (see "Known gaps" in repo README).
+When stock drops below `LOW_STOCK_THRESHOLD` (default 5), `InventoryService._maybe_emit_low_stock` fires after the decrement:
+
+1. Logs `low_stock` at warning level with product id, current quantity, threshold, seller id.
+2. Looks up `Product.seller_id` (single indexed SELECT).
+3. Enqueues `send_notification(seller_id, "in_app", "low_stock", payload)` via ARQ. Uses the FastAPI lifespan pool when available, otherwise creates a fresh pool for the call.
+
+The enqueue fires inside the decrement's DB transaction. If the transaction later rolls back, the notification stays queued — a transactional-outbox pattern would fix this, but for `low_stock` (advisory, low stakes) the trade-off is acceptable.
+
+If the enqueue itself can't reach Redis, it logs a warning and returns — never fails the order.

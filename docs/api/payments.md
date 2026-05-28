@@ -40,6 +40,7 @@ Payment processing is **not synchronous** with order creation. When `POST /order
 2. Gets or creates the `Payment` row.
 3. Randomly succeeds or fails per `PAYMENT_SUCCESS_RATE` (default 0.8).
 4. On success: order → `CONFIRMED`, payment → `SUCCESS`, enqueues `send_notification(order_confirmed)`.
-5. On failure: order → `PENDING` (so next retry can re-transition), payment → `FAILED`, raises `PaymentSimulationError` so ARQ retries (`max_tries=4` with backoff). After max retries: failure-path enqueues `send_notification(payment_failed)`.
+5. On failure: order → `PENDING` (so next retry can re-transition), payment → `FAILED`, enqueues `send_notification(payment_failed)`, raises `PaymentSimulationError` so ARQ retries (`max_tries=4` with backoff).
+6. On terminal failure (final retry exhausted): the worker commits the FAILED event + attempts increment, then calls `OrderService.system_cancel(order_id)` to restore stock and transition the order to `CANCELLED`.
 
-Every status transition is appended to `payment_events`. See [Payments concept](../concepts/payments.md) for retry behavior and terminal errors.
+Every status transition is appended to `payment_events`. See [Payments concept](../concepts/payments.md) for retry behavior and terminal-cancel flow.

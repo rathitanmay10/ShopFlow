@@ -56,14 +56,33 @@ Re-raise the exception to retry. Catch + log (no re-raise) to mark terminal.
 
 ```python
 from app.workers.queue import enqueue
-await enqueue(settings, "process_payment", str(order.id))
+from app.api.deps import ArqPoolDep
+
+@router.post("")
+async def create_order(..., pool: ArqPoolDep) -> OrderRead:
+    ...
+    await enqueue(settings, "process_payment", str(order.id), pool=pool)
 ```
 
-`enqueue` connects to Redis lazily via `get_redis_or_none(REDIS_URL, ctx=...)`. If Redis is unreachable, it logs a warning and returns — **fails open**. Useful for local dev without Redis; loud enough to catch in prod.
+`enqueue` accepts a `pool=` kwarg:
 
-## Known gap
+- If a pool is passed, it reuses it. The FastAPI `lifespan` in `app/main.py` creates one ARQ pool on startup, stores it in `app.state.arq_pool`, and closes it on shutdown. `ArqPoolDep` reads from `app.state` and injects it into routers. **This is the hot path** — single TCP connection shared across all requests.
+- If no pool is passed (worker that didn't pick it up, or lifespan failed), `enqueue` falls back to `create_pool(...) → enqueue → aclose()`. Slower, but resilient.
+- If Redis is unreachable on either path, `enqueue` logs a warning and returns `False` — **fails open**.
 
-ARQ pool not yet in FastAPI `lifespan`. Each `enqueue(...)` opens a fresh pool per call. Acceptable for now — hot path optimization later.
+## Enqueueing from a worker task
+
+ARQ provides its own `ArqRedis` pool to running tasks via `ctx["redis"]`. Pass it through:
+
+```python
+async def process_payment(ctx, order_id):
+    settings = ctx["settings"]
+    arq_pool = ctx.get("redis")
+    async with async_session_maker() as session:
+        await PaymentService(session, settings, arq_pool=arq_pool).process(UUID(order_id))
+```
+
+`PaymentService` then passes the pool down to its own `enqueue(...)` calls (for `order_confirmed` / `payment_failed` notifications) — no extra pool created.
 
 ## Testing tasks
 

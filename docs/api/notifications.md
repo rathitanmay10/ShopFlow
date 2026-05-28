@@ -27,10 +27,10 @@ Any authenticated user. Query: `page`, `page_size`. Returns notifications scoped
 
 Dispatched via a single ARQ task — `send_notification(user_id, channel, event_type, payload)` — with `channel ∈ {email, sms, in_app}`.
 
-| Event | Enqueued by | Channel |
-|---|---|---|
-| `order_confirmed` | `PaymentService.process` on success | `email` |
-| `payment_failed` | `PaymentService.process` on terminal failure | `email` |
-| `low_stock` | (not yet wired — currently logger-only) | — |
+| Event | Enqueued by | Channel | Recipient |
+|---|---|---|---|
+| `order_confirmed` | `PaymentService.process` on success | `email` | order customer |
+| `payment_failed` | `PaymentService.process` on every failed attempt | `email` | order customer |
+| `low_stock` | `InventoryService._maybe_emit_low_stock` when post-decrement qty ≤ `LOW_STOCK_THRESHOLD` | `in_app` | product seller |
 
 Delivery is **simulated**: each row goes into `notifications` and is marked `sent`. No real email / SMS / push provider integration.
