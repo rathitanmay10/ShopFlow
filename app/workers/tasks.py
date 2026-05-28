@@ -5,6 +5,7 @@ from uuid import UUID
 from arq.connections import RedisSettings
 
 from app.core.config import get_settings
+from app.core.exceptions import InvariantViolationError, NotFoundError
 from app.core.logging import configure_logging
 from app.db import async_session_maker, engine
 from app.models.notification import NotificationChannel
@@ -27,8 +28,12 @@ async def shutdown(_ctx: dict[str, Any]) -> None:
 async def process_payment(ctx: dict[str, Any], order_id: str) -> None:
     settings = ctx["settings"]
     async with async_session_maker() as session:
-        await PaymentService(session, settings).process(UUID(order_id))
-        await session.commit()
+        try:
+            await PaymentService(session, settings).process(UUID(order_id))
+            await session.commit()
+        except (NotFoundError, InvariantViolationError) as exc:
+            logger.warning("process_payment terminal skip", extra={"ctx_order_id": order_id, "ctx_reason": str(exc)})
+            return
 
 
 async def send_notification(
