@@ -66,7 +66,7 @@ Full list: see [`.env.example`](./.env.example).
 
 ```
 app/
-├── api/v1/         routers: auth, categories, products, inventory, orders, admin
+├── api/v1/         routers: auth, categories, products, inventory, orders, payments, notifications, admin
 ├── core/           config, security (JWT + bcrypt), exceptions, logging
 ├── db/             async engine, session factory, Base
 ├── models/         SQLAlchemy 2.x ORM
@@ -78,7 +78,7 @@ app/
 ├── utils/
 └── main.py         app factory
 alembic/            migrations 0001..0007
-tests/              conftest, api/, services/  (httpx.AsyncClient, transactional rollback)
+tests/              conftest, api/, services/, workers/  (httpx.AsyncClient, transactional rollback; worker tests patch async_session_maker)
 scripts/            export_postman.py
 ```
 
@@ -103,6 +103,8 @@ Layering: **API → Service → Repository → DB**. Routers never touch SQLAlch
 | GET | `/orders` | any auth | own orders; admin sees all |
 | GET | `/orders/{id}` | owner/admin | |
 | POST | `/orders/{id}/cancel` | owner/admin | restores stock, only pre-`SHIPPED` |
+| GET | `/payments/by-order/{order_id}` | owner/admin | returns Payment with status + events |
+| GET | `/notifications` | any auth | own notifications, paginated |
 | GET | `/admin/analytics` | admin | revenue, top products, daily orders, etc. |
 | GET | `/admin/users` | admin | |
 | PATCH | `/admin/users/{id}/suspend` | admin | flips `is_active` |
@@ -137,7 +139,11 @@ Stock decrement is atomic: `UPDATE products SET stock = stock - :qty WHERE id = 
 
 `PaymentService.process` is invoked by the `process_payment` ARQ task right after order creation. Outcome is randomized per `PAYMENT_SUCCESS_RATE`. Each transition (`INITIATED → PROCESSING → SUCCESS|FAILED`) is persisted to `payment_events`. Failures raise `PaymentSimulationError` so ARQ retries up to `WorkerSettings.max_tries` (hardcoded `4`) with backoff. Terminal errors (`NotFoundError`, `InvariantViolationError`) are caught and logged without retrying — these indicate stale queue entries after a DB reset or order cancellation.
 
+Payment status is exposed at `GET /api/v1/payments/by-order/{order_id}` — returns the Payment row plus its event history. Customers see their own; admins see any.
+
 Notifications are dispatched via a single ARQ task — `send_notification(user_id, channel, event_type, payload)` — with `channel ∈ {email, sms, in_app}`. Payment success enqueues `order_confirmed`; failure enqueues `payment_failed`. Delivery is simulated: each row goes into `notifications` and is marked `sent`.
+
+Notifications can be listed via `GET /api/v1/notifications?page=1&page_size=20` — returns paginated rows scoped to the requesting user.
 
 ## Tests
 
