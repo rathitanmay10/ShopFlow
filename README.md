@@ -56,7 +56,6 @@ Brings up `postgres`, `redis`, `migrate` (one-shot), `api`, `worker`. API listen
 | `JWT_REFRESH_TTL_DAYS` | no | `14` | |
 | `CORS_ORIGINS` | no | empty | comma-separated |
 | `PAYMENT_SUCCESS_RATE` | no | `0.8` | 0.0–1.0; controls payment simulator |
-| `PAYMENT_MAX_RETRIES` | no | `3` | |
 | `RATE_LIMIT_DEFAULT_PER_MIN` | no | `120` | per IP, fixed window |
 | `RATE_LIMIT_AUTH_PER_MIN` | no | `5` | failed logins per IP+email |
 | `LOW_STOCK_THRESHOLD` | no | `5` | emit `low_stock` event below this |
@@ -124,17 +123,19 @@ JWT bearer (HS256). Two token types: access (default 15 min) and refresh (defaul
 
 ```
 PENDING → PAYMENT_PROCESSING → CONFIRMED → SHIPPED → DELIVERED
-                                          ↘
-                                          CANCELLED
+   │              │                 │
+   └──────────────┴─────────────────┘
+                  ▼
+              CANCELLED
 ```
 
-Cancellation allowed from `PENDING`, `PAYMENT_PROCESSING`, or `CONFIRMED`. Once `SHIPPED`, cancellation is rejected with `422 invariant_violation`.
+Cancellation allowed from `PENDING`, `PAYMENT_PROCESSING`, or `CONFIRMED`. Once `SHIPPED` or `DELIVERED`, cancellation is rejected with `422 invariant_violation`.
 
 Stock decrement is atomic: `UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :qty RETURNING stock`. Two concurrent orders for the last unit cannot both succeed — exactly one wins.
 
 ## Payments
 
-`PaymentService.process` is invoked by the `process_payment` ARQ task right after order creation. Outcome is randomized per `PAYMENT_SUCCESS_RATE`. Each transition (`INITIATED → PROCESSING → SUCCESS|FAILED`) is persisted to `payment_events`. Failures raise `PaymentSimulationError` so ARQ retries up to `WorkerSettings.max_tries` with backoff.
+`PaymentService.process` is invoked by the `process_payment` ARQ task right after order creation. Outcome is randomized per `PAYMENT_SUCCESS_RATE`. Each transition (`INITIATED → PROCESSING → SUCCESS|FAILED`) is persisted to `payment_events`. Failures raise `PaymentSimulationError` so ARQ retries up to `WorkerSettings.max_tries` (hardcoded `4`) with backoff. Terminal errors (`NotFoundError`, `InvariantViolationError`) are caught and logged without retrying — these indicate stale queue entries after a DB reset or order cancellation.
 
 Notifications are dispatched via a single ARQ task — `send_notification(user_id, channel, event_type, payload)` — with `channel ∈ {email, sms, in_app}`. Payment success enqueues `order_confirmed`; failure enqueues `payment_failed`. Delivery is simulated: each row goes into `notifications` and is marked `sent`.
 
