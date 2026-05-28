@@ -52,7 +52,7 @@ class Payment(Base):
         onupdate=func.now(),
     )
     events: Mapped[list["PaymentEvent"]] = relationship(
-        back_populates="payment", lazy="selectin", cascade="all, delete-orphan"
+        back_populates="payment", cascade="all, delete-orphan"
     )
 
 
