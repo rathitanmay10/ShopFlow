@@ -1,7 +1,8 @@
 from collections.abc import Callable, Coroutine
 from typing import Annotated, Any
 
-from fastapi import Depends, Header
+from fastapi import Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -14,16 +15,21 @@ from app.repositories.user import UserRepository
 SessionDep = Annotated[AsyncSession, Depends(get_async_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
+_bearer = HTTPBearer(
+    scheme_name="Bearer",
+    description="Enter your JWT access token",
+    auto_error=False,
+)
+
 
 async def get_current_user(
     session: SessionDep,
     settings: SettingsDep,
-    authorization: Annotated[str | None, Header()] = None,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)] = None,
 ) -> User:
-    if not authorization or not authorization.lower().startswith("bearer "):
+    if not credentials:
         raise AuthenticationError("missing_token")
-    token = authorization.split(" ", 1)[1].strip()
-    payload = decode_token(settings, token, TokenType.ACCESS)
+    payload = decode_token(settings, credentials.credentials, TokenType.ACCESS)
     user = await UserRepository(session).get_by_id(subject_uuid(payload))
     if user is None or not user.is_active:
         raise AuthenticationError("user_inactive")
