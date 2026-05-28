@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.api.deps import CurrentUserDep, SessionDep, SettingsDep
+from app.api.deps import ArqPoolDep, CurrentUserDep, SessionDep, SettingsDep
 from app.repositories.order import OrderRepository
 from app.schemas.order import OrderCreate, OrderPage, OrderRead
 from app.services.inventory import InventoryService
@@ -13,11 +13,15 @@ from app.workers.queue import enqueue
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
-def _order_service(session: SessionDep, settings: SettingsDep) -> OrderService:
+def _order_service(
+    session: SessionDep,
+    settings: SettingsDep,
+    pool: ArqPoolDep,
+) -> OrderService:
     return OrderService(
         session,
         OrderRepository(session),
-        InventoryService(session, settings),
+        InventoryService(session, settings, arq_pool=pool),
         settings,
     )
 
@@ -32,10 +36,11 @@ async def create_order(
     session: SessionDep,
     settings: SettingsDep,
     service: OrderServiceDep,
+    pool: ArqPoolDep,
 ) -> OrderRead:
     order = await service.create_order(user, payload)
     await session.commit()
-    await enqueue(settings, "process_payment", str(order.id))
+    await enqueue(settings, "process_payment", str(order.id), pool=pool)
     return order
 
 

@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 
-from app.api.deps import CurrentUserDep, SessionDep, SettingsDep
+from app.api.deps import ArqPoolDep, CurrentUserDep, SessionDep, SettingsDep
 from app.services.inventory import InventoryService
 
 router = APIRouter(prefix="/products/{product_id}/inventory", tags=["inventory"])
@@ -25,8 +25,9 @@ async def adjust_inventory(
     user: CurrentUserDep,
     session: SessionDep,
     settings: SettingsDep,
+    pool: ArqPoolDep,
 ) -> InventoryAdjustOut:
-    service = InventoryService(session, settings)
+    service = InventoryService(session, settings, arq_pool=pool)
     new_qty = await service.adjust_for_actor(
         product_id, payload.delta, actor=user, note=payload.note
     )

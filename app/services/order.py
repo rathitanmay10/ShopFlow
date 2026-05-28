@@ -103,6 +103,16 @@ class OrderService:
 
     async def cancel(self, order_id: UUID, actor: User) -> Order:
         order = await self.get(order_id, actor)
+        return await self._cancel(order, actor_id=actor.id)
+
+    async def system_cancel(self, order_id: UUID) -> Order:
+        """Cancel without an actor permission check. Worker-only path."""
+        order = await self.orders.get(order_id)
+        if order is None:
+            raise NotFoundError("order_not_found")
+        return await self._cancel(order, actor_id=None)
+
+    async def _cancel(self, order: Order, *, actor_id: UUID | None) -> Order:
         if order.status not in CANCELLABLE:
             raise InvariantViolationError(
                 "order_not_cancellable", metadata={"status": order.status.value}
@@ -115,9 +125,8 @@ class OrderService:
                 item.quantity,
                 reason=MovementReason.CANCEL,
                 order_id=order.id,
-                actor_id=actor.id,
+                actor_id=actor_id,
             )
-        # Re-fetch so `items` collection is freshly bound after mutations.
         reloaded = await self.orders.get(order.id)
         assert reloaded is not None
         return reloaded

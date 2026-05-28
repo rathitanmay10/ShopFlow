@@ -1,3 +1,8 @@
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from arq.connections import RedisSettings, create_pool
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -9,6 +14,24 @@ from app.core.logging import configure_logging
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_context import RequestContextMiddleware
 
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    try:
+        pool = await create_pool(RedisSettings.from_dsn(settings.redis_url))
+    except Exception:
+        logger.warning("arq_pool_unavailable_on_startup", exc_info=True)
+        pool = None
+    app.state.arq_pool = pool
+    try:
+        yield
+    finally:
+        if pool is not None:
+            await pool.aclose()
+
 
 def create_app() -> FastAPI:
     settings = get_settings()
@@ -19,6 +42,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         docs_url="/docs",
         redoc_url="/redoc",
+        lifespan=lifespan,
     )
 
     app.add_middleware(RateLimitMiddleware)

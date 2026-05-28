@@ -2,6 +2,7 @@ import logging
 import secrets
 from uuid import UUID, uuid4
 
+from arq.connections import ArqRedis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,9 +30,16 @@ class PaymentService:
     Raises `PaymentSimulationError` on failure so ARQ retries the task.
     """
 
-    def __init__(self, session: AsyncSession, settings: Settings) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        settings: Settings,
+        *,
+        arq_pool: ArqRedis | None = None,
+    ) -> None:
         self.session = session
         self.settings = settings
+        self.arq_pool = arq_pool
 
     async def get_or_create_for_order(self, order: Order) -> Payment:
         existing = (
@@ -72,6 +80,7 @@ class PaymentService:
                 "email",
                 "order_confirmed",
                 {"order_id": str(order.id), "total": str(order.total)},
+                pool=self.arq_pool,
             )
             return payment
 
@@ -85,6 +94,7 @@ class PaymentService:
             "email",
             "payment_failed",
             {"order_id": str(order.id), "attempt": payment.attempts},
+            pool=self.arq_pool,
         )
         raise PaymentSimulationError("payment_simulated_failure")
 

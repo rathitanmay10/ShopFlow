@@ -1,7 +1,8 @@
 from collections.abc import Callable, Coroutine
 from typing import Annotated, Any
 
-from fastapi import Depends
+from arq.connections import ArqRedis
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +15,13 @@ from app.repositories.user import UserRepository
 
 SessionDep = Annotated[AsyncSession, Depends(get_async_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+
+
+def get_arq_pool(request: Request) -> ArqRedis | None:
+    return getattr(request.app.state, "arq_pool", None)
+
+
+ArqPoolDep = Annotated[ArqRedis | None, Depends(get_arq_pool)]
 
 _bearer = HTTPBearer(
     scheme_name="Bearer",

@@ -239,8 +239,6 @@ Import in Postman: `File → Import → shopflow.postman.json`.
 
 ## Known gaps
 
-- ARQ pool not yet in FastAPI lifespan — `enqueue` opens a fresh pool per call (acceptable for now, hot path later).
-- Payment terminal failure (after max retries) does not auto-cancel the order or restore stock yet.
-- Low-stock notification is logger-only; seller lookup + `send_notification` enqueue not wired.
 - `RequestContextMiddleware` emits request-id + access logs but does not auto-write `audit_logs` rows — call `AuditService.record(...)` from services for explicit business events.
 - Per-test engine in `tests/conftest.py` adds ~30–50 ms overhead per test. Acceptable while suite is small; revisit if it grows past ~50 tests.
+- Low-stock notification enqueue fires inside the same DB transaction that performed the decrement — if that transaction later rolls back, the notification is still queued (transactional outbox would fix it).

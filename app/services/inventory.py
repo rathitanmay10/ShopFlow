@@ -1,6 +1,7 @@
 import logging
 from uuid import UUID
 
+from arq.connections import ArqRedis
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +11,7 @@ from app.models.inventory import InventoryMovement, MovementReason
 from app.models.product import Product, ProductStatus
 from app.models.user import User, UserRole
 from app.repositories.product import ProductRepository
+from app.workers.queue import enqueue
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +23,16 @@ class InventoryService:
     so two concurrent decrements on the last unit cannot both succeed.
     """
 
-    def __init__(self, session: AsyncSession, settings: Settings) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        settings: Settings,
+        *,
+        arq_pool: ArqRedis | None = None,
+    ) -> None:
         self.session = session
         self.settings = settings
+        self.arq_pool = arq_pool
 
     async def decrement(
         self,
@@ -54,7 +63,7 @@ class InventoryService:
             )
         self._record(product_id, -qty, reason, order_id=order_id, actor_id=actor_id)
         await self._maybe_mark_out_of_stock(product_id, new_qty)
-        self._maybe_log_low_stock(product_id, new_qty)
+        await self._maybe_emit_low_stock(product_id, new_qty)
         return new_qty
 
     async def restore(
@@ -166,14 +175,33 @@ class InventoryService:
             .values(status=ProductStatus.ACTIVE)
         )
 
-    def _maybe_log_low_stock(self, product_id: UUID, qty: int) -> None:
+    async def _maybe_emit_low_stock(self, product_id: UUID, qty: int) -> None:
         if qty > self.settings.low_stock_threshold:
             return
+        seller_id = await self.session.scalar(
+            select(Product.seller_id).where(Product.id == product_id)
+        )
         logger.warning(
             "low_stock",
             extra={
                 "ctx_product_id": str(product_id),
                 "ctx_stock_quantity": qty,
                 "ctx_threshold": self.settings.low_stock_threshold,
+                "ctx_seller_id": str(seller_id) if seller_id else None,
             },
+        )
+        if seller_id is None:
+            return
+        await enqueue(
+            self.settings,
+            "send_notification",
+            str(seller_id),
+            "in_app",
+            "low_stock",
+            {
+                "product_id": str(product_id),
+                "stock_quantity": qty,
+                "threshold": self.settings.low_stock_threshold,
+            },
+            pool=self.arq_pool,
         )
