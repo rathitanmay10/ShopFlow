@@ -24,7 +24,7 @@ class CategoryRepository:
         self.session.add(category)
         try:
             await self.session.flush()
-        except IntegrityError:
-            raise ConflictError("slug_taken")
+        except IntegrityError as err:
+            raise ConflictError("slug_taken") from err
         await self.session.refresh(category)
         return category

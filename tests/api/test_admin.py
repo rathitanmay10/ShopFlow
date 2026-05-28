@@ -3,8 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_log import AuditLog
-from tests.conftest import _make_user
 from app.models.user import UserRole
+from tests.conftest import _make_user
 
 
 async def test_admin_can_suspend_user(

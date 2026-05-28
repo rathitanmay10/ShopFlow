@@ -1,8 +1,8 @@
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.conftest import _make_user
 from app.models.user import UserRole
+from tests.conftest import _make_user
 
 
 async def _create_product(
