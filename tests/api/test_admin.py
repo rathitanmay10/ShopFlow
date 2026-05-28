@@ -73,12 +73,16 @@ async def test_suspend_writes_audit_log(
     )
 
     rows = (
-        await session.execute(
-            select(AuditLog)
-            .where(AuditLog.action == "user_suspended")
-            .where(AuditLog.resource_id == str(target.id))
+        (
+            await session.execute(
+                select(AuditLog)
+                .where(AuditLog.action == "user_suspended")
+                .where(AuditLog.resource_id == str(target.id))
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert len(rows) == 1
     assert rows[0].actor_id == admin.id
     assert rows[0].resource_type == "user"

@@ -48,18 +48,12 @@ async def list_products(
         page=page,
         page_size=page_size,
     )
-    return ProductPage(
-        items=[ProductRead.model_validate(p) for p in items],
-        total=total,
-        page=page,
-        page_size=page_size,
-    )
+    return ProductPage(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.get("/{product_id}")
 async def get_product(product_id: UUID, service: ProductServiceDep) -> ProductRead:
-    product = await service.get(product_id)
-    return ProductRead.model_validate(product)
+    return await service.get(product_id)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
@@ -71,7 +65,7 @@ async def create_product(
 ) -> ProductRead:
     product = await service.create(payload, user)
     await session.commit()
-    return ProductRead.model_validate(product)
+    return product
 
 
 @router.put("/{product_id}")
@@ -84,7 +78,7 @@ async def update_product(
 ) -> ProductRead:
     product = await service.update(product_id, payload, user)
     await session.commit()
-    return ProductRead.model_validate(product)
+    return product
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)

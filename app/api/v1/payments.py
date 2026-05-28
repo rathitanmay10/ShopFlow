@@ -23,5 +23,4 @@ async def get_payment_by_order(
     user: CurrentUserDep,
     service: PaymentServiceDep,
 ) -> PaymentRead:
-    payment = await service.get_for_order(order_id, user)
-    return PaymentRead.model_validate(payment)
+    return await service.get_for_order(order_id, user)

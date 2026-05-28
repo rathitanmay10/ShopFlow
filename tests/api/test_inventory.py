@@ -17,9 +17,7 @@ async def _create_product(
     return r.json()
 
 
-async def test_seller_can_adjust_own_product(
-    client: AsyncClient, seller, auth_headers
-) -> None:
+async def test_seller_can_adjust_own_product(client: AsyncClient, seller, auth_headers) -> None:
     product = await _create_product(client, seller, auth_headers, stock=10)
     pid = product["id"]
 
@@ -32,9 +30,7 @@ async def test_seller_can_adjust_own_product(
     assert r.json()["stock_quantity"] == 15
 
 
-async def test_seller_can_decrease_own_product(
-    client: AsyncClient, seller, auth_headers
-) -> None:
+async def test_seller_can_decrease_own_product(client: AsyncClient, seller, auth_headers) -> None:
     product = await _create_product(client, seller, auth_headers, sku="SKU-DEC", stock=10)
     pid = product["id"]
 

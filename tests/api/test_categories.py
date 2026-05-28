@@ -35,9 +35,7 @@ async def test_list_returns_created_categories(client: AsyncClient, admin, auth_
     assert names == ["Apparel", "Books"]  # ordered by name
 
 
-async def test_customer_cannot_create_category(
-    client: AsyncClient, customer, auth_headers
-) -> None:
+async def test_customer_cannot_create_category(client: AsyncClient, customer, auth_headers) -> None:
     r = await client.post(
         "/api/v1/categories",
         json={"name": "Forbidden", "slug": "forbidden"},

@@ -25,9 +25,7 @@ async def test_list_notifications_returns_own(
     assert data["items"][0]["id"] == str(notif.id)
 
 
-async def test_list_notifications_empty(
-    client: AsyncClient, customer, auth_headers
-) -> None:
+async def test_list_notifications_empty(client: AsyncClient, customer, auth_headers) -> None:
     r = await client.get("/api/v1/notifications", headers=auth_headers(customer))
     assert r.status_code == 200
     data = r.json()

@@ -27,7 +27,7 @@ async def register(
 ) -> UserRead:
     user = await service.register(payload)
     await session.commit()
-    return UserRead.model_validate(user)
+    return user
 
 
 @router.post("/login")

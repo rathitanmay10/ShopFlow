@@ -22,10 +22,14 @@ class NotificationRepository:
             await self.session.execute(select(func.count()).select_from(base.subquery()))
         ).scalar_one()
         rows = (
-            await self.session.execute(
-                base.order_by(Notification.created_at.desc())
-                .offset((page - 1) * page_size)
-                .limit(page_size)
+            (
+                await self.session.execute(
+                    base.order_by(Notification.created_at.desc())
+                    .offset((page - 1) * page_size)
+                    .limit(page_size)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return list(rows), total

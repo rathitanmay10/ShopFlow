@@ -19,8 +19,7 @@ CategoryServiceDep = Annotated[CategoryService, Depends(_category_service)]
 
 @router.get("")
 async def list_categories(service: CategoryServiceDep) -> list[CategoryRead]:
-    cats = await service.list_()
-    return [CategoryRead.model_validate(c) for c in cats]
+    return await service.list_()
 
 
 @router.post(
@@ -33,4 +32,4 @@ async def create_category(
 ) -> CategoryRead:
     cat = await service.create(payload)
     await session.commit()
-    return CategoryRead.model_validate(cat)
+    return cat

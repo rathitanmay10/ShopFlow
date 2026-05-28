@@ -32,7 +32,10 @@ async def process_payment(ctx: dict[str, Any], order_id: str) -> None:
             await PaymentService(session, settings).process(UUID(order_id))
             await session.commit()
         except (NotFoundError, InvariantViolationError) as exc:
-            logger.warning("process_payment terminal skip", extra={"ctx_order_id": order_id, "ctx_reason": str(exc)})
+            logger.warning(
+                "process_payment terminal skip",
+                extra={"ctx_order_id": order_id, "ctx_reason": str(exc)},
+            )
             return
 
 

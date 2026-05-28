@@ -15,7 +15,9 @@ class CategoryRepository:
         return result.scalar_one_or_none()
 
     async def list_(self) -> list[Category]:
-        rows = (await self.session.execute(select(Category).order_by(Category.name))).scalars().all()
+        rows = (
+            (await self.session.execute(select(Category).order_by(Category.name))).scalars().all()
+        )
         return list(rows)
 
     async def create(self, category: Category) -> Category:

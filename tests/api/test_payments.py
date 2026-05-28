@@ -13,11 +13,11 @@ async def _create_product(client, seller, auth_headers, *, sku=None, stock=5, pr
     r = await client.post(
         "/api/v1/products",
         json={
-                "sku": sku or f"SKU-PAY-{uuid4().hex[:6]}",
-                "name": "Widget",
-                "price": price,
-                "stock_quantity": stock,
-            },
+            "sku": sku or f"SKU-PAY-{uuid4().hex[:6]}",
+            "name": "Widget",
+            "price": price,
+            "stock_quantity": stock,
+        },
         headers=auth_headers(seller),
     )
     assert r.status_code == 201, r.text
@@ -78,9 +78,7 @@ async def test_get_payment_other_customer_forbidden(
     assert r.status_code == 403
 
 
-async def test_get_payment_order_not_found(
-    client: AsyncClient, customer, auth_headers
-) -> None:
+async def test_get_payment_order_not_found(client: AsyncClient, customer, auth_headers) -> None:
     r = await client.get(f"/api/v1/payments/by-order/{uuid4()}", headers=auth_headers(customer))
     assert r.status_code == 404
 
