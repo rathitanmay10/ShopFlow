@@ -1,18 +1,26 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, status
-from sqlalchemy import select
 
 from app.api.deps import SessionDep, require_role
-from app.models.category import Category
 from app.models.user import UserRole
 from app.schemas.category import CategoryCreate, CategoryRead
+from app.services.category import CategoryService
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
 
+def _category_service(session: SessionDep) -> CategoryService:
+    return CategoryService(session)
+
+
+CategoryServiceDep = Annotated[CategoryService, Depends(_category_service)]
+
+
 @router.get("")
-async def list_categories(session: SessionDep) -> list[CategoryRead]:
-    rows = (await session.execute(select(Category).order_by(Category.name))).scalars().all()
-    return [CategoryRead.model_validate(c) for c in rows]
+async def list_categories(service: CategoryServiceDep) -> list[CategoryRead]:
+    cats = await service.list_()
+    return [CategoryRead.model_validate(c) for c in cats]
 
 
 @router.post(
@@ -20,9 +28,9 @@ async def list_categories(session: SessionDep) -> list[CategoryRead]:
     dependencies=[Depends(require_role(UserRole.ADMIN))],
     status_code=status.HTTP_201_CREATED,
 )
-async def create_category(payload: CategoryCreate, session: SessionDep) -> CategoryRead:
-    category = Category(name=payload.name, slug=payload.slug)
-    session.add(category)
+async def create_category(
+    payload: CategoryCreate, service: CategoryServiceDep, session: SessionDep
+) -> CategoryRead:
+    cat = await service.create(payload)
     await session.commit()
-    await session.refresh(category)
-    return CategoryRead.model_validate(category)
+    return CategoryRead.model_validate(cat)

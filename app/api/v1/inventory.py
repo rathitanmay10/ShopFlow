@@ -4,10 +4,6 @@ from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUserDep, SessionDep, SettingsDep
-from app.core.exceptions import NotFoundError, PermissionDeniedError
-from app.models.inventory import MovementReason
-from app.models.user import UserRole
-from app.repositories.product import ProductRepository
 from app.services.inventory import InventoryService
 
 router = APIRouter(prefix="/products/{product_id}/inventory", tags=["inventory"])
@@ -30,16 +26,9 @@ async def adjust_inventory(
     session: SessionDep,
     settings: SettingsDep,
 ) -> InventoryAdjustOut:
-    product = await ProductRepository(session).get(product_id)
-    if product is None:
-        raise NotFoundError("product_not_found")
-    is_admin = user.role == UserRole.ADMIN
-    if not is_admin and product.seller_id != user.id:
-        raise PermissionDeniedError("not_product_owner")
-    reason = MovementReason.ADMIN_ADJUST if is_admin else MovementReason.SELLER_ADJUST
     service = InventoryService(session, settings)
-    new_qty = await service.adjust(
-        product_id, payload.delta, reason=reason, actor_id=user.id, note=payload.note
+    new_qty = await service.adjust_for_actor(
+        product_id, payload.delta, actor=user, note=payload.note
     )
     await session.commit()
     return InventoryAdjustOut(stock_quantity=new_qty)

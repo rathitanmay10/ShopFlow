@@ -20,6 +20,14 @@ class ProductRepository:
         result = await self.session.execute(self._base().where(Product.id == product_id))
         return result.scalar_one_or_none()
 
+    async def get_many_by_ids(self, ids: list[UUID]) -> list[Product]:
+        if not ids:
+            return []
+        rows = (
+            await self.session.execute(self._base().where(Product.id.in_(ids)))
+        ).scalars().all()
+        return list(rows)
+
     async def get_by_sku(self, sku: str) -> Product | None:
         result = await self.session.execute(self._base().where(Product.sku == sku))
         return result.scalar_one_or_none()

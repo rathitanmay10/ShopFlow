@@ -5,9 +5,11 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
-from app.core.exceptions import InvariantViolationError, NotFoundError
+from app.core.exceptions import InvariantViolationError, NotFoundError, PermissionDeniedError
 from app.models.inventory import InventoryMovement, MovementReason
 from app.models.product import Product, ProductStatus
+from app.models.user import User, UserRole
+from app.repositories.product import ProductRepository
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +99,23 @@ class InventoryService:
         if note:
             await self._annotate_last_movement(product_id, note)
         return new_qty
+
+    async def adjust_for_actor(
+        self,
+        product_id: UUID,
+        delta: int,
+        *,
+        actor: User,
+        note: str | None = None,
+    ) -> int:
+        product = await ProductRepository(self.session).get(product_id)
+        if product is None:
+            raise NotFoundError("product_not_found")
+        is_admin = actor.role == UserRole.ADMIN
+        if not is_admin and product.seller_id != actor.id:
+            raise PermissionDeniedError("not_product_owner")
+        reason = MovementReason.ADMIN_ADJUST if is_admin else MovementReason.SELLER_ADJUST
+        return await self.adjust(product_id, delta, reason=reason, actor_id=actor.id, note=note)
 
     def _record(
         self,

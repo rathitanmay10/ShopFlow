@@ -1,7 +1,6 @@
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
@@ -12,9 +11,10 @@ from app.core.exceptions import (
 )
 from app.models.inventory import MovementReason
 from app.models.order import Order, OrderItem, OrderStatus
-from app.models.product import Product, ProductStatus
+from app.models.product import ProductStatus
 from app.models.user import User, UserRole
 from app.repositories.order import OrderRepository
+from app.repositories.product import ProductRepository
 from app.schemas.order import OrderCreate
 from app.services.inventory import InventoryService
 from app.services.order_state import CANCELLABLE, assert_transition
@@ -35,15 +35,7 @@ class OrderService:
 
     async def create_order(self, customer: User, payload: OrderCreate) -> Order:
         product_ids = [it.product_id for it in payload.items]
-        rows = (
-            (
-                await self.session.execute(
-                    select(Product).where(Product.id.in_(product_ids), Product.deleted_at.is_(None))
-                )
-            )
-            .scalars()
-            .all()
-        )
+        rows = await ProductRepository(self.session).get_many_by_ids(product_ids)
         product_map = {p.id: p for p in rows}
         missing = set(product_ids) - set(product_map.keys())
         if missing:
