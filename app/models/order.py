@@ -50,7 +50,7 @@ class Order(Base):
         onupdate=func.now(),
     )
     items: Mapped[list["OrderItem"]] = relationship(
-        back_populates="order", lazy="selectin", cascade="all, delete-orphan"
+        back_populates="order", cascade="all, delete-orphan"
     )
 
 
