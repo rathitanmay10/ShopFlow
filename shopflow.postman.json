@@ -399,6 +399,56 @@
       }
     },
     {
+      "name": "Get Payment By Order",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/payments/by-order/{order_id}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "payments",
+            "by-order",
+            "{order_id}"
+          ]
+        },
+        "description": ""
+      }
+    },
+    {
+      "name": "List Notifications",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/notifications",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications"
+          ]
+        },
+        "description": ""
+      }
+    },
+    {
       "name": "Analytics",
       "request": {
         "method": "GET",
