@@ -2,6 +2,8 @@
 
 Event-driven e-commerce backend. Fully-async FastAPI + PostgreSQL + Redis + ARQ workers.
 
+**Docs:** <https://rathitanmay10.github.io/ShopFlow/> — architecture, concepts, ops, and per-endpoint reference.
+
 See [`CLAUDE.md`](./CLAUDE.md) for architecture, conventions, and dependency-pinning policy.
 
 ## Stack

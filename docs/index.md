@@ -2,6 +2,8 @@
 
 Event-driven e-commerce backend. Fully-async FastAPI + PostgreSQL + Redis + ARQ workers.
 
+**Source:** <https://github.com/rathitanmay10/ShopFlow>
+
 ## What's inside
 
 Products, inventory, orders, payments, notifications, audit logs. RBAC (customer / seller / admin) over JWT. Atomic stock decrement under concurrency. Order finite-state machine. Background workers for simulated payments and notifications.
