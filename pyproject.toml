@@ -5,7 +5,7 @@ description = "ShopFlow event-driven e-commerce backend"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-    "fastapi>=0.136.1,<0.138",
+    "fastapi[standard]>=0.136.1,<0.138",
     "uvicorn[standard]>=0.32,<0.34",
     "sqlalchemy[asyncio]>=2.0.36,<2.1",
     "asyncpg>=0.30,<0.31",
