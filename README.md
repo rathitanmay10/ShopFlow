@@ -113,6 +113,13 @@ Layering: **API → Service → Repository → DB**. Routers never touch SQLAlch
 
 JWT bearer (HS256). Two token types: access (default 15 min) and refresh (default 14 d). Three roles: `customer` (default), `seller`, `admin`. RBAC enforced via `require_role(...)` dependency.
 
+### Testing in Swagger UI
+
+1. Open <http://localhost:8000/docs>
+2. Call `POST /api/v1/auth/login` with your credentials → copy `access_token` from the response
+3. Click **Authorize** (🔒) at the top right → paste the token → **Authorize**
+4. All subsequent requests in the UI will include `Authorization: Bearer <token>`
+
 ## Order lifecycle
 
 ```
