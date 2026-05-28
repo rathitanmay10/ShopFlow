@@ -18,3 +18,10 @@ class NotificationRead(BaseModel):
     status: NotificationStatus
     created_at: datetime
     sent_at: datetime | None
+
+
+class NotificationPage(BaseModel):
+    items: list[NotificationRead]
+    total: int
+    page: int
+    page_size: int

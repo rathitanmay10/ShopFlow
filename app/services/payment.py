@@ -6,9 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
-from app.core.exceptions import InvariantViolationError, NotFoundError
+from app.core.exceptions import InvariantViolationError, NotFoundError, PermissionDeniedError
 from app.models.order import Order, OrderStatus
 from app.models.payment import Payment, PaymentEvent, PaymentStatus
+from app.models.user import User, UserRole
+from app.repositories.payment import PaymentRepository
 from app.services.order_state import assert_transition
 from app.workers.queue import enqueue
 
@@ -105,3 +107,14 @@ class PaymentService:
                 reason=reason,
             )
         )
+
+    async def get_for_order(self, order_id: UUID, actor: User) -> Payment:
+        order = await self.session.get(Order, order_id)
+        if order is None:
+            raise NotFoundError("order_not_found")
+        if actor.role != UserRole.ADMIN and order.customer_id != actor.id:
+            raise PermissionDeniedError("not_order_owner")
+        payment = await PaymentRepository(self.session).get_by_order_id(order_id)
+        if payment is None:
+            raise NotFoundError("payment_not_found")
+        return payment
