@@ -1,0 +1,6 @@
+[project]
+site_name = "ShopFlow"
+site_url = "https://rathitanmay10.github.io/ShopFlow/"
+site_description = "Event-driven e-commerce backend — async FastAPI + Postgres + Redis + ARQ"
+docs_dir = "docs"
+site_dir = "site"

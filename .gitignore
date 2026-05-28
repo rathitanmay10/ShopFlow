@@ -226,3 +226,6 @@ __marimo__/
 .ty_cache/
 .venv/
 .DS_Store
+
+# Zensical
+site/
